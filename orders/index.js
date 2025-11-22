@@ -25,6 +25,12 @@ async function cancel(event) {
   return handleCancel(event, user);
 }
 
+async function updateStatus(event) {
+  const user = getUserFromEvent(event);
+  const { handleUpdateStatus } = require('./updateStatus');
+  return handleUpdateStatus(event, user);
+}
+
 // Backwards-compatible single handler
 async function handler(event) {
   const method = event.httpMethod;
@@ -44,4 +50,4 @@ async function handler(event) {
   }
 }
 
-module.exports = { create, list, get, cancel, handler };
+module.exports = { create, list, get, cancel, updateStatus, handler };
