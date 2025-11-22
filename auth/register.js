@@ -44,22 +44,15 @@ function isValidEmail(email) {
   return emailRegex.test(email);
 }
 
-// Validar role
-function isValidRole(role) {
-  const validRoles = ["Kitchen", "User", "Admin","Delivery"];
-  return validRoles.includes(role);
-}
-
-// NOTE: department logic removed — this service is multitenant and departments were not required.
-
 const { json } = require("../http");
 
 exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body);
-    const { tenantId, email, username, password, role } = body;
+    // No se espera 'role' en el request; lo asignamos por defecto a 'user'
+    const { tenantId, email, username, password } = body;
 
-    if (!tenantId || !email || !username || !password || !role) {
+    if (!tenantId || !email || !username || !password) {
       return json(400, { message: "Missing fields" }, event);
     }
 
@@ -74,11 +67,6 @@ exports.handler = async (event) => {
       return json(400, { message: passwordValidation.message }, event);
     }
 
-    // Validar role
-    if (!isValidRole(role)) {
-      return json(400, { message: "Invalid role. Must be one of: Kitchen, User, Admin, Delivery" }, event);
-    }
-
     // tenantId should be a non-empty string — minimal validation
     if (typeof tenantId !== "string" || tenantId.trim() === "") {
       return json(400, { message: "Invalid tenantId" }, event);
@@ -87,7 +75,8 @@ exports.handler = async (event) => {
     // Normalizar email y username para comparacion
     const normalizedEmail = email.toLowerCase().trim();
     const normalizedUsername = username.toLowerCase().trim();
-    const normalizedRole = role.toLowerCase();
+    // Forzar que el rol almacenado sea siempre 'user' (registro público de usuarios)
+    const normalizedRole = "user";
 
     // Verificar si el email ya existe en este tenant (Query + Filter para ser compatible con distintos diseños de índices)
     const emailCheck = await client.send(
