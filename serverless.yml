@@ -52,7 +52,10 @@ functions:
           path: orders
           method: post
           cors: true
-          authorizer: authorizer
+          authorizer:
+            name: authorizer
+            type: request
+            identitySource: method.request.header.Authorization
 
   ordersList:
     handler: orders/index.list
@@ -61,7 +64,10 @@ functions:
           path: orders
           method: get
           cors: true
-          authorizer: authorizer
+          authorizer:
+            name: authorizer
+            type: request
+            identitySource: method.request.header.Authorization
 
   ordersGet:
     handler: orders/index.get
@@ -70,7 +76,10 @@ functions:
           path: orders/{id}
           method: get
           cors: true
-          authorizer: authorizer
+          authorizer:
+            name: authorizer
+            type: request
+            identitySource: method.request.header.Authorization
 
   ordersUpdateStatus:
     handler: orders/index.updateStatus
@@ -79,7 +88,10 @@ functions:
           path: orders/{id}/status
           method: patch
           cors: true
-          authorizer: authorizer
+          authorizer:
+            name: authorizer
+            type: request
+            identitySource: method.request.header.Authorization
 
 resources:
   Resources:
