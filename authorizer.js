@@ -26,13 +26,43 @@ exports.handler = async (event) => {
     // Validar que el token existe
     if (!token) {
       console.error("AUTHORIZER ERROR: No token provided");
-      throw new Error("Unauthorized");
+      return {
+        principalId: "anonymous",
+        policyDocument: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Action: "execute-api:Invoke",
+              Effect: "Deny",
+              Resource: event.methodArn || '*',
+            },
+          ],
+        },
+        context: {
+          error: "No token provided"
+        }
+      };
     }
 
     // Verificar que JWT_SECRET está configurado
     if (!process.env.JWT_SECRET) {
       console.error("AUTHORIZER ERROR: JWT_SECRET not configured");
-      throw new Error("Unauthorized");
+      return {
+        principalId: "anonymous",
+        policyDocument: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Action: "execute-api:Invoke",
+              Effect: "Deny",
+              Resource: event.methodArn || '*',
+            },
+          ],
+        },
+        context: {
+          error: "JWT_SECRET not configured"
+        }
+      };
     }
 
     // Extraer el token (remover "Bearer " si existe)
@@ -40,14 +70,44 @@ exports.handler = async (event) => {
 
     if (!raw || raw.length === 0) {
       console.error("AUTHORIZER ERROR: Empty token after processing");
-      throw new Error("Unauthorized");
+      return {
+        principalId: "anonymous",
+        policyDocument: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Action: "execute-api:Invoke",
+              Effect: "Deny",
+              Resource: event.methodArn || '*',
+            },
+          ],
+        },
+        context: {
+          error: "Empty token after processing"
+        }
+      };
     }
 
     // Validar formato del token (debe tener 3 partes separadas por puntos)
     const parts = raw.split(".");
     if (parts.length !== 3) {
       console.error("AUTHORIZER ERROR: Invalid token format");
-      throw new Error("Unauthorized");
+      return {
+        principalId: "anonymous",
+        policyDocument: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Action: "execute-api:Invoke",
+              Effect: "Deny",
+              Resource: event.methodArn || '*',
+            },
+          ],
+        },
+        context: {
+          error: "Invalid token format"
+        }
+      };
     }
 
     const [headerEnc, payloadEnc, signature] = parts;
@@ -55,7 +115,22 @@ exports.handler = async (event) => {
     // Verificar que las partes no estén vacías
     if (!headerEnc || !payloadEnc || !signature) {
       console.error("AUTHORIZER ERROR: Token parts are empty");
-      throw new Error("Unauthorized");
+      return {
+        principalId: "anonymous",
+        policyDocument: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Action: "execute-api:Invoke",
+              Effect: "Deny",
+              Resource: event.methodArn || '*',
+            },
+          ],
+        },
+        context: {
+          error: "Token parts are empty"
+        }
+      };
     }
 
     // Verificar firma del token usando el mismo algoritmo (HMAC SHA256) y JWT_SECRET
@@ -70,7 +145,22 @@ exports.handler = async (event) => {
 
     if (signature !== expectedSig) {
       console.error("AUTHORIZER ERROR: Invalid signature");
-      throw new Error("Unauthorized");
+      return {
+        principalId: "anonymous",
+        policyDocument: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Action: "execute-api:Invoke",
+              Effect: "Deny",
+              Resource: event.methodArn || '*',
+            },
+          ],
+        },
+        context: {
+          error: "Invalid signature"
+        }
+      };
     }
 
     // Decodificar payload
@@ -79,20 +169,65 @@ exports.handler = async (event) => {
       payload = JSON.parse(fromBase64url(payloadEnc));
     } catch (parseError) {
       console.error("AUTHORIZER ERROR: Failed to parse payload", parseError);
-      throw new Error("Unauthorized");
+      return {
+        principalId: "anonymous",
+        policyDocument: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Action: "execute-api:Invoke",
+              Effect: "Deny",
+              Resource: event.methodArn || '*',
+            },
+          ],
+        },
+        context: {
+          error: "Failed to parse payload"
+        }
+      };
     }
 
     // Validar campos requeridos en el payload
     if (!payload.userId || !payload.role || !payload.email) {
       console.error("AUTHORIZER ERROR: Missing required fields in payload");
-      throw new Error("Unauthorized");
+      return {
+        principalId: "anonymous",
+        policyDocument: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Action: "execute-api:Invoke",
+              Effect: "Deny",
+              Resource: event.methodArn || '*',
+            },
+          ],
+        },
+        context: {
+          error: "Missing required fields in payload"
+        }
+      };
     }
 
     // Verificar expiración del token
     const now = Math.floor(Date.now() / 1000);
     if (payload.exp && payload.exp < now) {
       console.error("AUTHORIZER ERROR: Token expired");
-      throw new Error("Unauthorized");
+      return {
+        principalId: "anonymous",
+        policyDocument: {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Action: "execute-api:Invoke",
+              Effect: "Deny",
+              Resource: event.methodArn || '*',
+            },
+          ],
+        },
+        context: {
+          error: "Token expired"
+        }
+      };
     }
 
     // Obtener methodArn del evento (puede estar en diferentes lugares según el tipo de authorizer)
@@ -144,6 +279,21 @@ exports.handler = async (event) => {
 
   } catch (err) {
     console.error("AUTHORIZER ERROR:", err);
-    throw new Error("Unauthorized");
+    return {
+      principalId: "anonymous",
+      policyDocument: {
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Action: "execute-api:Invoke",
+            Effect: "Deny",
+            Resource: (event && event.methodArn) || '*',
+          },
+        ],
+      },
+      context: {
+        error: err.message || "Unauthorized"
+      }
+    };
   }
 };

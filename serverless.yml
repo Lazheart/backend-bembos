@@ -100,6 +100,10 @@ functions:
           path: admin/workers
           method: post
           cors: true
+            authorizer:
+              name: authorizer
+              type: request
+              identitySource: method.request.header.Authorization
 
   adminUpdateMenu:
     handler: admin/updateMenu.handler
@@ -108,6 +112,10 @@ functions:
           path: admin/menu
           method: post
           cors: true
+            authorizer:
+              name: authorizer
+              type: request
+              identitySource: method.request.header.Authorization
 
   createKitchen:
     handler: kitchen/createKitchen.handler
@@ -140,6 +148,10 @@ functions:
           path: menu
           method: get
           cors: true
+            authorizer:
+              name: authorizer
+              type: request
+              identitySource: method.request.header.Authorization
 
 resources:
   Resources:
