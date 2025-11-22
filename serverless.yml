@@ -15,6 +15,8 @@ provider:
 
   environment:
     USER_TABLE: UserTable-${sls:stage}
+    ORDERS_TABLE: OrdersTable-${sls:stage}
+    ORDERS_BUCKET: restaurant-orders-dashboard-${sls:stage}
     INCIDENT_TABLE: IncidentTable-${sls:stage}
     CONNECTIONS_TABLE: WebSocketConnections-${sls:stage}
     JWT_SECRET: ${env:JWT_SECRET}
@@ -40,6 +42,9 @@ functions:
           method: post
           cors: true
 
+  authorizer:
+    handler: authorizer.handler
+
   ordersCreate:
     handler: orders/index.create
     events:
@@ -47,6 +52,7 @@ functions:
           path: orders
           method: post
           cors: true
+          authorizer: authorizer
 
   ordersList:
     handler: orders/index.list
@@ -55,6 +61,7 @@ functions:
           path: orders
           method: get
           cors: true
+          authorizer: authorizer
 
   ordersGet:
     handler: orders/index.get
@@ -63,14 +70,16 @@ functions:
           path: orders/{id}
           method: get
           cors: true
+          authorizer: authorizer
 
-  ordersCancel:
-    handler: orders/index.cancel
+  ordersUpdateStatus:
+    handler: orders/index.updateStatus
     events:
       - http:
-          path: orders/{id}
-          method: delete
+          path: orders/{id}/status
+          method: patch
           cors: true
+          authorizer: authorizer
 
 resources:
   Resources:
@@ -98,3 +107,18 @@ resources:
               - { AttributeName: tenantId, KeyType: HASH }
               - { AttributeName: username, KeyType: RANGE }
             Projection: { ProjectionType: ALL }
+        OrdersTable:
+          Type: AWS::DynamoDB::Table
+          Properties:
+            TableName: ${self:provider.environment.ORDERS_TABLE}
+            BillingMode: PAY_PER_REQUEST
+            AttributeDefinitions:
+              - { AttributeName: PK, AttributeType: S }
+              - { AttributeName: SK, AttributeType: S }
+            KeySchema:
+              - { AttributeName: PK, KeyType: HASH }
+              - { AttributeName: SK, KeyType: RANGE }
+        OrdersBucket:
+          Type: AWS::S3::Bucket
+          Properties:
+            BucketName: ${self:provider.environment.ORDERS_BUCKET}
