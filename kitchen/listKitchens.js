@@ -11,11 +11,27 @@ exports.handler = async (event) => {
       return json(400, { message: 'tenantId query param required' }, event);
     }
 
-    const result = await dynamo.send(new QueryCommand({
+    // Paginación: limit y lastKey
+    const qs = event.queryStringParameters || {};
+    const limit = qs.limit ? Math.max(1, Math.min(100, parseInt(qs.limit))) : 20;
+    let ExclusiveStartKey = undefined;
+    if (qs.lastKey) {
+      try {
+        ExclusiveStartKey = JSON.parse(Buffer.from(qs.lastKey, 'base64').toString('utf8'));
+      } catch (e) {
+        return json(400, { message: 'Invalid lastKey param' }, event);
+      }
+    }
+
+    const params = {
       TableName: KITCHEN_TABLE,
       KeyConditionExpression: 'tenantId = :t',
       ExpressionAttributeValues: { ':t': { S: tenantId } },
-    }));
+      Limit: limit,
+    };
+    if (ExclusiveStartKey) params.ExclusiveStartKey = ExclusiveStartKey;
+
+    const result = await dynamo.send(new QueryCommand(params));
 
     const kitchens = (result.Items || []).map(it => ({
       kitchenId: it.kitchenId.S,
@@ -25,7 +41,12 @@ exports.handler = async (event) => {
       active: !!it.active?.BOOL,
     }));
 
-    return json(200, { kitchens }, event);
+    let nextKey = null;
+    if (result.LastEvaluatedKey) {
+      nextKey = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
+    }
+
+    return json(200, { kitchens, nextKey }, event);
   } catch (err) {
     console.error('LIST KITCHENS ERROR:', err);
     return json(500, { message: 'Server error', error: err.message }, event);

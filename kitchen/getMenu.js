@@ -6,16 +6,32 @@ const MENU_TABLE = process.env.MENU_TABLE || 'MenuTable'; // PK=tenantId, SK=dis
 
 exports.handler = async (event) => {
 	try {
-		const tenantId = (event.queryStringParameters && event.queryStringParameters.tenantId) || null;
+		const qs = event.queryStringParameters || {};
+		const tenantId = qs.tenantId || null;
 		if (!tenantId) {
 			return json(400, { message: 'tenantId query param required' }, event);
 		}
 
-		const result = await dynamo.send(new QueryCommand({
+		// Paginación: limit y lastKey
+		const limit = qs.limit ? Math.max(1, Math.min(100, parseInt(qs.limit))) : 20;
+		let ExclusiveStartKey = undefined;
+		if (qs.lastKey) {
+			try {
+				ExclusiveStartKey = JSON.parse(Buffer.from(qs.lastKey, 'base64').toString('utf8'));
+			} catch (e) {
+				return json(400, { message: 'Invalid lastKey param' }, event);
+			}
+		}
+
+		const params = {
 			TableName: MENU_TABLE,
 			KeyConditionExpression: 'tenantId = :t',
 			ExpressionAttributeValues: { ':t': { S: tenantId } },
-		}));
+			Limit: limit,
+		};
+		if (ExclusiveStartKey) params.ExclusiveStartKey = ExclusiveStartKey;
+
+		const result = await dynamo.send(new QueryCommand(params));
 
 		const dishes = (result.Items || []).map(d => ({
 			dishId: d.dishId.S,
@@ -26,7 +42,13 @@ exports.handler = async (event) => {
 			imageUrl: d.imageUrl?.S || null,
 		})).filter(d => d.available);
 
-		return json(200, { dishes }, event);
+		// Codificar LastEvaluatedKey para la siguiente página
+		let nextKey = null;
+		if (result.LastEvaluatedKey) {
+			nextKey = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
+		}
+
+		return json(200, { dishes, nextKey }, event);
 	} catch (err) {
 		console.error('GET MENU ERROR:', err);
 		return json(500, { message: 'Server error', error: err.message }, event);

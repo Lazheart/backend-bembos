@@ -7,13 +7,27 @@ async function handleList(event, user) {
   const role = (user.role || 'USER').toUpperCase();
   const createdBy = user.sub || 'anonymous';
 
+  // Paginación: limit y lastKey
+  const qs = event.queryStringParameters || {};
+  const limit = qs.limit ? Math.max(1, Math.min(100, parseInt(qs.limit))) : 20;
+  let ExclusiveStartKey = undefined;
+  if (qs.lastKey) {
+    try {
+      ExclusiveStartKey = JSON.parse(Buffer.from(qs.lastKey, 'base64').toString('utf8'));
+    } catch (e) {
+      return response(400, { message: 'Invalid lastKey param' });
+    }
+  }
+
   const params = {
     TableName: TABLE_NAME,
     KeyConditionExpression: 'PK = :pk',
     ExpressionAttributeValues: {
       ':pk': { S: `TENANT#${tenantId}` },
     },
+    Limit: limit,
   };
+  if (ExclusiveStartKey) params.ExclusiveStartKey = ExclusiveStartKey;
 
   // Si no es OWNER, filtrar por createdBy
   if (role !== 'OWNER') {
@@ -32,7 +46,12 @@ async function handleList(event, user) {
     createdBy: item.createdBy?.S,
   }));
 
-  return response(200, { orders });
+  let nextKey = null;
+  if (result.LastEvaluatedKey) {
+    nextKey = Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString('base64');
+  }
+
+  return response(200, { orders, nextKey });
 }
 
 module.exports = { handleList };

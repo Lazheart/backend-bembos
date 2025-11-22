@@ -129,12 +129,27 @@ Response 200:
 { "message": "Dish updated", "dishId": "DISH-uuid", "imageUrl": "https://..." }
 ```
 
-### 5. GET /menu?tenantId=t1
-Listado público de platos disponibles.
-Response 200:
-```json
-{ "dishes": [ { "dishId":"DISH-uuid", "name":"Burger", "description":"Carne y queso", "price":12.5, "imageUrl":null } ] }
+
+### 5. GET /menu?tenantId=t1[&limit=20][&lastKey=...]
+Listado paginado de platos disponibles.
+
+**Parámetros opcionales:**
+- `limit`: cantidad máxima de platos por página (default 20, máx 100)
+- `lastKey`: token de paginación (devuelto por la respuesta anterior)
+
+**Ejemplo de request:**
 ```
+GET /menu?tenantId=t1&limit=10
+```
+
+**Respuesta 200:**
+```json
+{
+	"dishes": [ { "dishId":"DISH-uuid", "name":"Burger", "description":"Carne y queso", "price":12.5, "imageUrl":null } ],
+	"nextKey": "eyJ0ZW5hbnRJZCI6InQxIiwiZGlzaElkIjoiRElTSC11dWlkIn0="
+}
+```
+Si hay más resultados, `nextKey` se usa como `lastKey` en la siguiente petición para obtener la próxima página.
 
 ### 6. POST /kitchens (protegido)
 Crear cocina (rol admin en body).
@@ -146,12 +161,27 @@ Response:
 { "message":"Kitchen created", "kitchenId":"KITCHEN-uuid" }
 ```
 
-### 7. GET /kitchens (protegido)
-Query param `tenantId`.
-Response:
-```json
-{ "kitchens": [ { "kitchenId":"KITCHEN-uuid", "name":"Central", "maxCooking":5, "currentCooking":0, "active":true } ] }
+
+### 7. GET /kitchens?tenantId=t1[&limit=20][&lastKey=...]
+Listado paginado de cocinas del tenant (protegido).
+
+**Parámetros opcionales:**
+- `limit`: cantidad máxima de cocinas por página (default 20, máx 100)
+- `lastKey`: token de paginación (devuelto por la respuesta anterior)
+
+**Ejemplo de request:**
 ```
+GET /kitchens?tenantId=t1&limit=5
+```
+
+**Respuesta 200:**
+```json
+{
+	"kitchens": [ { "kitchenId":"KITCHEN-uuid", "name":"Central", "maxCooking":5, "currentCooking":0, "active":true } ],
+	"nextKey": "eyJ0ZW5hbnRJZCI6InQxIiwia2l0Y2hlbklkIjoiS0lUQ0hFTi11dWlkIn0="
+}
+```
+Si hay más resultados, `nextKey` se usa como `lastKey` en la siguiente petición para obtener la próxima página.
 
 ### 8. POST /orders (protegido)
 Crea orden. Auto asigna cocina si hay capacidad.
@@ -177,12 +207,27 @@ Response 201:
 }
 ```
 
-### 9. GET /orders (protegido)
-Lista órdenes del tenant; usuarios no OWNER ven sólo las suyas.
-Response:
-```json
-{ "orders": [ { "orderId":"ORD-uuid", "status":"COOKING", "total":25.0, "createdAt":"ISO", "updatedAt":"ISO", "createdBy":"user-sub" } ] }
+
+### 9. GET /orders[?limit=20][&lastKey=...]
+Lista paginada de órdenes del tenant; usuarios no OWNER ven sólo las suyas.
+
+**Parámetros opcionales:**
+- `limit`: cantidad máxima de órdenes por página (default 20, máx 100)
+- `lastKey`: token de paginación (devuelto por la respuesta anterior)
+
+**Ejemplo de request:**
 ```
+GET /orders?limit=10
+```
+
+**Respuesta 200:**
+```json
+{
+	"orders": [ { "orderId":"ORD-uuid", "status":"COOKING", "total":25.0, "createdAt":"ISO", "updatedAt":"ISO", "createdBy":"user-sub" } ],
+	"nextKey": "eyJQSyI6IlRFTkFOVCN0MSIsIlNLIjoiT1JERVIjbGFzdElkIn0="
+}
+```
+Si hay más resultados, `nextKey` se usa como `lastKey` en la siguiente petición para obtener la próxima página.
 
 ### 10. GET /orders/{id} (protegido)
 Detalle de una orden. Usuarios con rol USER sólo si son creador.
