@@ -100,7 +100,7 @@ functions:
           path: admin/workers
           method: post
           cors: true
-            authorizer:
+          authorizer:
               name: authorizer
               type: request
               identitySource: method.request.header.Authorization
@@ -112,7 +112,7 @@ functions:
           path: admin/menu
           method: post
           cors: true
-            authorizer:
+          authorizer:
               name: authorizer
               type: request
               identitySource: method.request.header.Authorization
@@ -148,10 +148,10 @@ functions:
           path: menu
           method: get
           cors: true
-          authorizer:
-              name: authorizer
-              type: request
-              identitySource: method.request.header.Authorization
+          # authorizer:
+          #     name: authorizer
+          #     type: request
+          #     identitySource: method.request.header.Authorization
 
 resources:
   Resources:
