@@ -8,10 +8,22 @@ const KITCHEN_TABLE = process.env.KITCHEN_TABLE || `KitchenTable-${process.env.S
 exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || '{}');
-    const { tenantId, name, role, maxCooking } = body;
+    const { name, role: bodyRole, maxCooking } = body;
+
+    // Obtener tenantId y role del authorizer (más seguro). Fallback a body solo si authorizer ausente.
+    let tenantId = null;
+    let role = null;
+    if (event && event.requestContext && event.requestContext.authorizer) {
+      const auth = event.requestContext.authorizer;
+      const claims = auth.claims || auth;
+      tenantId = auth.tenantId || (claims && claims.tenantId) || null;
+      role = auth.role || (claims && claims.role) || null;
+    }
+    if (!tenantId && body.tenantId) tenantId = body.tenantId;
+    if (!role && bodyRole) role = bodyRole;
 
     if (!tenantId || !name) {
-      return json(400, { message: 'Missing tenantId or name' }, event);
+      return json(400, { message: 'Missing tenantId (from authorizer) or name' }, event);
     }
     if (!role || String(role).toLowerCase() !== 'admin') {
       return json(403, { message: 'Forbidden: admin role required' }, event);

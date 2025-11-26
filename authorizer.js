@@ -10,6 +10,22 @@ function fromBase64url(str) {
 
 exports.handler = async (event) => {
   try {
+    // Debug: registrar forma general del evento (sin incluir tokens)
+    try {
+      const debugEvent = {
+        hasHeaders: !!(event && event.headers),
+        methodArn: event && event.methodArn,
+        routeArn: event && event.routeArn,
+        requestContext: event && event.requestContext && {
+          apiId: event.requestContext.apiId,
+          accountId: event.requestContext.accountId,
+          region: event.requestContext.region,
+        },
+      };
+      console.debug("AUTHORIZER EVENT SUMMARY:", JSON.stringify(debugEvent));
+    } catch (e) {
+      console.debug("AUTHORIZER EVENT: (failed to stringify)");
+    }
     // Soportar REQUEST authorizer (event.headers) y TOKEN authorizer (event.authorizationToken)
     let token = null;
 
@@ -262,16 +278,30 @@ exports.handler = async (event) => {
     }
 
     // Preparar contexto seguro: API Gateway/Lambda authorizer solo acepta strings
+    // Además sanitizamos las claves para que solo contengan [A-Za-z0-9_]
     const safeContext = {};
-    for (const key of Object.keys(payload)) {
-      // Convertir todos los valores a string
+    for (const rawKey of Object.keys(payload)) {
+      // Sanitize key name (replace invalid characters with underscore)
+      const key = String(rawKey).replace(/[^a-zA-Z0-9_]/g, "_");
+      // Convertir valor a string y truncar para evitar límites excesivos
+      let val = "";
       try {
-        safeContext[key] = String(payload[key]);
+        val = String(payload[rawKey]);
       } catch (e) {
-        safeContext[key] = "" + payload[key];
+        val = "" + payload[rawKey];
       }
+      // Truncar a 1024 caracteres para seguridad
+      if (val.length > 1024) val = val.substring(0, 1024);
+      safeContext[key] = val;
     }
-
+    //    if (process.env.DEBUG_AUTHORIZER === 'true') {
+    //   try {
+    //     console.debug('AUTHORIZER SAFE CONTEXT:', JSON.stringify(safeContext));
+    //   } catch (e) {
+    //     console.debug('AUTHORIZER SAFE CONTEXT (non-serializable)');
+    //   }
+    // }
+  
     // Retornar política IAM con contexto (valores como strings)
     return {
       principalId: String(payload.userId),

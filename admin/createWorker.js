@@ -50,7 +50,28 @@ const ALLOWED_ROLES = new Set(["admin", "kitchen", "delivery"]);
 exports.handler = async (event) => {
 	try {
 		const body = JSON.parse(event.body || "{}");
-		const { tenantId, email, username, password, role } = body;
+		// Obtener role y tenant del authorizer (protegido). Si no viene, denegar.
+		let authRole = null;
+		let authTenant = null;
+		if (event && event.requestContext && event.requestContext.authorizer) {
+			const auth = event.requestContext.authorizer;
+			authRole = auth.role || (auth.claims && auth.claims.role) || null;
+			authTenant = auth.tenantId || (auth.claims && auth.claims.tenantId) || null;
+		}
+		if (!authRole || String(authRole).toLowerCase() !== "admin") {
+			return json(403, { message: "Forbidden: admin role required" }, event);
+		}
+
+		// tenantId for the new worker MUST match the admin's tenant. Ignore body.tenantId or validate it.
+		const { tenantId: bodyTenant, email, username, password, role } = body;
+		if (!authTenant) {
+			return json(400, { message: "Authorizer did not provide tenantId" }, event);
+		}
+		const tenantId = String(authTenant);
+		// If body provided a tenantId different from admin's, reject.
+		if (bodyTenant && String(bodyTenant) !== tenantId) {
+			return json(400, { message: "tenantId in body must match admin tenant" }, event);
+		}
 
 		if (!tenantId || !email || !username || !password || !role) {
 			return json(400, { message: "Missing fields" }, event);

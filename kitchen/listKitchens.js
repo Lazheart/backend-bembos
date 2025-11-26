@@ -6,13 +6,21 @@ const KITCHEN_TABLE = process.env.KITCHEN_TABLE || `KitchenTable-${process.env.S
 
 exports.handler = async (event) => {
   try {
-    const tenantId = (event.queryStringParameters && event.queryStringParameters.tenantId) || null;
+    // Prefer tenantId from authorizer (protected endpoint). Fallback to query param if not present.
+    let tenantId = null;
+    if (event && event.requestContext && event.requestContext.authorizer) {
+      const auth = event.requestContext.authorizer;
+      const claims = auth.claims || auth;
+      tenantId = auth.tenantId || (claims && claims.tenantId) || null;
+    }
+    const qs = event.queryStringParameters || {};
+    if (!tenantId) tenantId = qs.tenantId || null;
     if (!tenantId) {
-      return json(400, { message: 'tenantId query param required' }, event);
+      return json(400, { message: 'tenantId required (authorizer or query param)' }, event);
     }
 
     // Paginación: limit y lastKey
-    const qs = event.queryStringParameters || {};
+    // Paginación: limit and lastKey — `qs` already defined above
     const limit = qs.limit ? Math.max(1, Math.min(100, parseInt(qs.limit))) : 20;
     let ExclusiveStartKey = undefined;
     if (qs.lastKey) {

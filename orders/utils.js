@@ -41,8 +41,13 @@ async function logOrderEvent({ orderId, tenantId, userId, eventType, payload }) 
 
 function getUserFromEvent(event) {
   // Extrae claims/autorizador (compatibilidad con API Gateway/Lambda authorizer)
-  const user = (event.requestContext && event.requestContext.authorizer && event.requestContext.authorizer.claims) || {};
-  return user;
+  // Soporta ambos formatos:
+  // - event.requestContext.authorizer.claims (cuando authorizer coloca claims)
+  // - event.requestContext.authorizer (cuando authorizer devuelve contexto plano)
+  if (!event || !event.requestContext) return {};
+  const auth = event.requestContext.authorizer || {};
+  const claims = auth.claims || auth;
+  return claims || {};
 }
 
 module.exports = {

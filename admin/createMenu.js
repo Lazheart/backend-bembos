@@ -1,74 +1,33 @@
-const { randomBytes } = require("crypto");
-const { v4: uuidv4 } = require("uuid");
-const { S3Client, PutObjectCommand } = require("@aws-sdk/client-s3");
 const { DynamoDBClient, PutItemCommand } = require("@aws-sdk/client-dynamodb");
-
-const s3 = new S3Client({});
 const dynamo = new DynamoDBClient({});
-
-const MENU_BUCKET = process.env.MENU_BUCKET || process.env.BUCKET || "menu-bucket";
 const MENU_TABLE = process.env.MENU_TABLE || "MenuTable"; // Per-dish table: PK=tenantId, SK=dishId
-
 const { json } = require("../http");
-
-function generateDishId() {
-  return `DISH-${uuidv4()}`;
-}
-
-function isValidUrl(u) {
-  try {
-    const url = new URL(u);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch (e) {
-    return false;
-  }
-}
-
-function sanitizeFilename(name) {
-  return name.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
-async function uploadBase64ToS3(base64OrDataUri, tenantId, filename, contentType) {
-  // soporta data:[mime];base64,XXXX o raw base64
-  let matches = base64OrDataUri.match(/^data:(.+);base64,(.+)$/);
-  let b64;
-  if (matches) {
-    contentType = contentType || matches[1];
-    b64 = matches[2];
-  } else {
-    b64 = base64OrDataUri;
-  }
-
-  const buffer = Buffer.from(b64, "base64");
-  const ext = (contentType || "image/jpeg").split("/", 2)[1] || "jpg";
-  const key = `${tenantId}/menu/${Date.now()}-${randomBytes(6).toString("hex")}-${sanitizeFilename(filename || `image.${ext}`)}`;
-
-  await s3.send(
-    new PutObjectCommand({
-      Bucket: MENU_BUCKET,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType || `image/${ext}`,
-      ACL: "public-read",
-    })
-  );
-
-  // Construir URL pública (asume bucket público / CORS configurado)
-  const url = `https://${MENU_BUCKET}.s3.amazonaws.com/${encodeURIComponent(key)}`;
-  return url;
-}
+const { generateDishId, isValidUrl, uploadBase64ToS3 } = require("./menuHelpers");
 
 exports.handler = async (event) => {
   try {
     const body = JSON.parse(event.body || "{}");
-    const { tenantId, name, description, price, available, role, imageUrl, imageBase64, imageFilename, imageContentType } = body;
+    const { name, description, price, available, imageUrl, imageBase64, imageFilename, imageContentType } = body;
+
+    // Obtener role y tenant desde authorizer (más seguro). Fallback a body.role/tenantId solo si authorizer ausente.
+    let role = null;
+    let tenantId = null;
+    if (event && event.requestContext && event.requestContext.authorizer) {
+      const auth = event.requestContext.authorizer;
+      // compatibilidad: algunos setups colocan claims bajo authorizer.claims
+      const claims = auth.claims || auth;
+      role = auth.role || (claims && claims.role) || null;
+      tenantId = auth.tenantId || (claims && claims.tenantId) || null;
+    }
+    if (!role && body.role) role = body.role;
+    if (!tenantId && body.tenantId) tenantId = body.tenantId;
 
     // Campos mínimos para crear
     if (!tenantId || !name || (price === undefined || price === null)) {
-      return json(400, { message: "Missing fields: tenantId, name and price are required" }, event);
+      return json(400, { message: "Missing fields: tenantId (from authorizer), name and price are required" }, event);
     }
 
-    // Role: por seguridad, este endpoint es para admin. Requerir role === 'admin' si se provee.
+    // Role: por seguridad, este endpoint es para admin. Requerir role === 'admin'.
     if (!role || String(role).toLowerCase() !== "admin") {
       return json(403, { message: "Forbidden: admin role required" }, event);
     }
