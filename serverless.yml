@@ -122,7 +122,7 @@ custom:
   scripts:
     hooks:
       # generate OpenAPI spec automatically before deploy
-      before:deploy:deploy: "npx serverless openapi generate"
+      before:deploy:deploy: "npx serverless openapi generate && node ./scripts/postprocess-openapi.js"
 
 functions:
 
